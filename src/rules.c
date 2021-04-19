@@ -6,6 +6,7 @@
 #include <glib.h>
 
 #include "dunst.h"
+#include "utils.h"
 
 GSList *rules = NULL;
 
@@ -26,6 +27,8 @@ void rule_apply(struct rule *r, struct notification *n)
                 n->transient = r->set_transient;
         if (r->skip_display != -1)
                 n->skip_display = r->skip_display;
+        if (r->hide_if)
+                n->skip_display = run_script(r->hide_if, n, true);
         if (r->markup != MARKUP_NULL)
                 n->markup = r->markup;
         if (r->new_icon)

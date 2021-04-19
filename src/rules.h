@@ -28,6 +28,7 @@ struct rule {
         int match_transient;
         int set_transient;
         int skip_display;
+        const char *hide_if;
         char *new_icon;
         char *fg;
         char *bg;
