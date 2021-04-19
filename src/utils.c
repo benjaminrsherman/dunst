@@ -8,9 +8,11 @@
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "icon.h"
 #include "log.h"
 
 /* see utils.h */
@@ -257,6 +259,73 @@ bool safe_setenv(const char* key, const char* value){
                 setenv(key, value, 1);
 
         return true;
+}
+
+/* see utils.h */
+int run_script(const char *script, struct notification *n, bool sync) {
+        const char *appname = n->appname ? n->appname : "";
+        const char *summary = n->summary ? n->summary : "";
+        const char *body = n->body ? n->body : "";
+        const char *icon = n->iconname ? n->iconname : "";
+
+        const char *urgency = notification_urgency_to_string(n->urgency);
+
+        int pid1 = fork();
+
+        if (pid1 == 0) {
+                // if asynchronous, fork a second time
+                int pid2 = 0;
+
+                if (!sync)
+                        pid2 = fork();
+
+                if (pid2) {
+                        if (pid2 == -1)
+                                LOG_W("Unable to detach script %s: %s", script, strerror(errno));
+                        exit(0);
+                } else {
+                        // Set environment variables
+                        gchar *n_id_str = g_strdup_printf("%i", n->id);
+                        gchar *n_progress_str = g_strdup_printf("%i", n->progress);
+                        gchar *n_timeout_str = g_strdup_printf("%li", n->timeout/1000);
+                        gchar *n_timestamp_str = g_strdup_printf("%li", n->timestamp / 1000);
+                        char* icon_path = get_path_from_icon_name(icon);
+                        safe_setenv("DUNST_APP_NAME",  appname);
+                        safe_setenv("DUNST_SUMMARY",   summary);
+                        safe_setenv("DUNST_BODY",      body);
+                        safe_setenv("DUNST_ICON_PATH", icon_path);
+                        safe_setenv("DUNST_URGENCY",   urgency);
+                        safe_setenv("DUNST_ID",        n_id_str);
+                        safe_setenv("DUNST_PROGRESS",  n_progress_str);
+                        safe_setenv("DUNST_CATEGORY",  n->category);
+                        safe_setenv("DUNST_STACK_TAG", n->stack_tag);
+                        safe_setenv("DUNST_URLS",      n->urls);
+                        safe_setenv("DUNST_TIMEOUT",   n_timeout_str);
+                        safe_setenv("DUNST_TIMESTAMP", n_timestamp_str);
+                        safe_setenv("DUNST_STACK_TAG", n->stack_tag);
+
+                        execlp(script,
+                                        script,
+                                        appname,
+                                        summary,
+                                        body,
+                                        icon,
+                                        urgency,
+                                        (char *)NULL);
+
+                        LOG_W("Unable to run script %s: %s", script, strerror(errno));
+                        exit(EXIT_FAILURE);
+                }
+        } else if (pid1 == -1) {
+                LOG_W("Unable to run script %s: %s", script, strerror(errno));
+                return EXIT_FAILURE;
+        }
+
+        // If asynchronous this will only be launching the script and then exiting
+        int status;
+        waitpid(pid1, &status, 0);
+
+        return WEXITSTATUS(status);
 }
 
 /* vim: set ft=c tabstop=8 shiftwidth=8 expandtab textwidth=0: */

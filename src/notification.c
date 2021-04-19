@@ -3,15 +3,12 @@
 #include "notification.h"
 
 #include <assert.h>
-#include <errno.h>
 #include <glib.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #include "dbus.h"
 #include "dunst.h"
@@ -109,13 +106,6 @@ void notification_run_script(struct notification *n)
 
         n->script_run = true;
 
-        const char *appname = n->appname ? n->appname : "";
-        const char *summary = n->summary ? n->summary : "";
-        const char *body = n->body ? n->body : "";
-        const char *icon = n->iconname ? n->iconname : "";
-
-        const char *urgency = notification_urgency_to_string(n->urgency);
-
         for(int i = 0; i < n->script_count; i++) {
 
                 const char *script = n->scripts[i];
@@ -123,50 +113,7 @@ void notification_run_script(struct notification *n)
                 if (STR_EMPTY(script))
                         continue;
 
-                int pid1 = fork();
-
-                if (pid1) {
-                        int status;
-                        waitpid(pid1, &status, 0);
-                } else {
-                        // second fork to prevent zombie processes
-                        int pid2 = fork();
-                        if (pid2) {
-                                exit(0);
-                        } else {
-                                // Set environment variables
-                                gchar *n_id_str = g_strdup_printf("%i", n->id);
-                                gchar *n_progress_str = g_strdup_printf("%i", n->progress);
-                                gchar *n_timeout_str = g_strdup_printf("%li", n->timeout/1000);
-                                gchar *n_timestamp_str = g_strdup_printf("%li", n->timestamp / 1000);
-                                char* icon_path = get_path_from_icon_name(icon);
-                                safe_setenv("DUNST_APP_NAME",  appname);
-                                safe_setenv("DUNST_SUMMARY",   summary);
-                                safe_setenv("DUNST_BODY",      body);
-                                safe_setenv("DUNST_ICON_PATH", icon_path);
-                                safe_setenv("DUNST_URGENCY",   urgency);
-                                safe_setenv("DUNST_ID",        n_id_str);
-                                safe_setenv("DUNST_PROGRESS",  n_progress_str);
-                                safe_setenv("DUNST_CATEGORY",  n->category);
-                                safe_setenv("DUNST_STACK_TAG", n->stack_tag);
-                                safe_setenv("DUNST_URLS",      n->urls);
-                                safe_setenv("DUNST_TIMEOUT",   n_timeout_str);
-                                safe_setenv("DUNST_TIMESTAMP", n_timestamp_str);
-                                safe_setenv("DUNST_STACK_TAG", n->stack_tag);
-
-                                execlp(script,
-                                                script,
-                                                appname,
-                                                summary,
-                                                body,
-                                                icon,
-                                                urgency,
-                                                (char *)NULL);
-
-                                LOG_W("Unable to run script %s: %s", n->scripts[i], strerror(errno));
-                                exit(EXIT_FAILURE);
-                        }
-                }
+                run_script(script, n, false);
         }
 }
 

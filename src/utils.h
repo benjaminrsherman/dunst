@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include "notification.h"
+
 //! Test if a string is NULL or empty
 #define STR_EMPTY(s) (!s || (*s == '\0'))
 //! Test if a string is non-NULL and not empty
@@ -148,6 +150,20 @@ const char *user_get_home(void);
  * @returns: A bool that is true when it succeeds
  */
 bool safe_setenv(const char* key, const char* value);
+
+/**
+ * Runs a script with a notification as the argument.  If `sync` is true,
+ * this will run synchronously and return the exit status of the script.  Otherwise,
+ * this runs asynchronously.
+ *
+ * The values of the notification are passed to the script via environment variables.
+ *
+ * @param script Path to the script to execute
+ * @param n Notification to pass to the script
+ * @param sync Whether or not to wait for the script to finish executing
+ * @returns: The exit status of the script if synchronous, or 0 otherwise
+ */
+int run_script(const char* script, struct notification* n, bool sync);
 
 #endif
 /* vim: set ft=c tabstop=8 shiftwidth=8 expandtab textwidth=0: */
